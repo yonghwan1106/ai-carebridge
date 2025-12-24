@@ -53,7 +53,7 @@ export const CARE_BRIDGE_SYSTEM_PROMPT = `당신은 **AI 케어브릿지** 돌�
 먼저, 부모님의 현재 상황에 대해 편하게 말씀해 주시겠어요?"
 `;
 
-export const INITIAL_GREETING = `안녕하세요! **AI 케어브릿지**입니다. 🤝
+export const INITIAL_GREETING = `안녕하세요! AI 케어브릿지입니다. 🤝
 
 부모님 돌봄 시작이 막막하셨죠?
 장기요양등급 신청부터 숨은 복지혜택 발굴, 요양시설 탐색까지
