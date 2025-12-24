@@ -53,7 +53,7 @@ export function ChatInterface({ autoPlay = false, onComplete }: ChatInterfacePro
           setIsTyping(false);
           setMessages((prev) => [...prev, currentMessage]);
           setCurrentIndex((prev) => prev + 1);
-        }, Math.min(delay, 1500));
+        }, delay);
       } else {
         // User messages appear after delay
         timerRef.current = setTimeout(() => {
