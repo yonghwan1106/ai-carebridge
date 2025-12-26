@@ -165,44 +165,30 @@ export default function Home() {
     );
   }
 
-  // Agent Mode
+  // Agent Mode - 전체 화면 채팅창
   if (mode === 'agent') {
     return (
       <CareProvider>
-        <div className="min-h-screen bg-gray-100 flex flex-col">
-          {/* Header */}
-          <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div className="h-screen flex flex-col">
+          {/* 최소한의 상단 바 */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 flex items-center justify-between">
             <button
               onClick={() => setMode('landing')}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-white/80 hover:text-white text-sm"
             >
               <ArrowRight className="w-4 h-4 rotate-180" />
-              <span>돌아가기</span>
+              <span>홈</span>
             </button>
 
-            <div className="flex items-center gap-3">
-              <Bot className="w-5 h-5 text-emerald-600" />
-              <h1 className="font-bold text-lg">AI 케어브릿지 - AI 에이전트</h1>
-            </div>
-
-            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-2">
+            <Badge className="bg-white/20 text-white border-white/30 gap-2">
               <Sparkles className="w-3 h-3" />
-              Claude AI 연동
+              Claude AI
             </Badge>
-          </header>
+          </div>
 
-          {/* Main Content */}
-          <main className="flex-1 p-6 flex items-center justify-center">
-            <div className="w-full max-w-4xl h-[80vh] shadow-2xl rounded-2xl overflow-hidden">
-              <AgentChatInterface />
-            </div>
-          </main>
-
-          {/* Info Bar */}
-          <div className="bg-emerald-50 border-t border-emerald-200 px-6 py-3">
-            <div className="max-w-4xl mx-auto flex items-center justify-center gap-4 text-sm text-emerald-700">
-              <span>💡 자유롭게 대화하세요. AI가 상황에 맞는 도구를 자동으로 사용합니다.</span>
-            </div>
+          {/* 전체 화면 채팅 인터페이스 */}
+          <div className="flex-1 overflow-hidden">
+            <AgentChatInterface />
           </div>
         </div>
       </CareProvider>

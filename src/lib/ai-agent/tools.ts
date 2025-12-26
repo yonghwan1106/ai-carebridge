@@ -4,6 +4,8 @@ import type { ClaudeTool, ToolHandler, ToolRegistry } from './types';
 import type { CareState, CareLevelDiagnosis, WelfareBenefit, CareFacility, Appointment } from '@/types/care';
 import { WELFARE_BENEFITS } from '@/lib/mock-data/welfare-benefits';
 import { CARE_FACILITIES } from '@/lib/mock-data/care-facilities';
+import { searchLtcFacilities } from '@/lib/api/public-data-api';
+import { searchWelfareServices } from '@/lib/api/welfare-api';
 
 // ============================================
 // Tool Definitions (Claude API 형식)
@@ -430,35 +432,70 @@ const handleSearchWelfareBenefits: ToolHandler = async (input, state) => {
     conditions?: string[];
   };
 
-  // 조건에 맞는 복지 혜택 필터링
-  let benefits = WELFARE_BENEFITS.filter(b => {
-    if (age < 65 && b.eligibility.includes('65세 이상')) return false;
-    if (incomeLevel === 'high' && b.eligibility.includes('저소득')) return false;
-    return true;
-  });
+  let benefits: WelfareBenefit[] = [];
+  let totalCount = 0;
+  let isRealData = false;
 
-  // 상위 5개 선택
-  benefits = benefits.slice(0, 5);
+  // 1. 공공데이터포털 복지서비스 API 호출 시도
+  try {
+    const apiResult = await searchWelfareServices({
+      age,
+      region,
+      conditions,
+      incomeLevel
+    });
+
+    if (apiResult.benefits.length > 0) {
+      benefits = apiResult.benefits;
+      totalCount = apiResult.totalCount;
+      isRealData = apiResult.isRealData;
+    }
+  } catch (error) {
+    console.log('복지서비스 API 호출 실패, Mock 데이터 사용:', error);
+  }
+
+  // 2. API 결과가 없으면 Mock 데이터 사용
+  if (benefits.length === 0) {
+    benefits = WELFARE_BENEFITS.filter(b => {
+      if (age < 65 && b.eligibility.includes('65세 이상')) return false;
+      if (incomeLevel === 'high' && b.eligibility.includes('저소득')) return false;
+      return true;
+    });
+    benefits = benefits.slice(0, 5);
+    totalCount = benefits.length;
+  }
 
   const totalMonthlyAmount = benefits
     .filter(b => b.monthlyAmount)
     .reduce((sum, b) => sum + (b.monthlyAmount || 0), 0);
 
   return {
-    result: { benefits, totalMonthlyAmount },
+    result: {
+      benefits,
+      totalMonthlyAmount,
+      totalCount,
+      dataSource: isRealData ? '복지로 (한국사회보장정보원)' : '샘플 데이터'
+    },
     stateUpdate: {
       discoveredBenefits: benefits,
       currentStep: 'benefit_discovery' as const
     },
     displayData: {
       type: 'benefits',
-      title: '발굴된 복지 혜택',
+      title: isRealData
+        ? `📡 실시간 복지혜택 검색 결과 (총 ${totalCount}건)`
+        : '발굴된 복지 혜택',
       items: [
-        { icon: '🎁', label: '발굴된 혜택 수', value: `${benefits.length}개`, highlight: true },
+        {
+          icon: isRealData ? '📡' : '🎁',
+          label: isRealData ? '실시간 데이터' : '발굴된 혜택 수',
+          value: `${benefits.length}개${isRealData ? ` (전체 ${totalCount}건)` : ''}`,
+          highlight: true
+        },
         { icon: '💰', label: '예상 월 수령액', value: `약 ${(totalMonthlyAmount / 10000).toFixed(0)}만원` },
         ...benefits.slice(0, 3).map(b => ({
           icon: '✨',
-          label: b.name,
+          label: b.name.length > 15 ? b.name.substring(0, 15) + '...' : b.name,
           value: b.monthlyAmount ? `월 ${(b.monthlyAmount / 10000).toFixed(0)}만원` : '지원',
           highlight: false
         }))
@@ -475,27 +512,68 @@ const handleSearchCareFacilities: ToolHandler = async (input, state) => {
     specialties?: string[];
   };
 
-  // 시설 필터링
-  let facilities = CARE_FACILITIES.filter(f => {
-    if (facilityType && facilityType !== '전체' && f.type !== facilityType) return false;
-    if (maxBudget && f.monthlyFee.min > maxBudget * 10000) return false;
-    return true;
-  });
+  let facilities: CareFacility[] = [];
+  let totalCount = 0;
+  let isRealData = false;
 
-  // 평점순 정렬
-  facilities = facilities.sort((a, b) => b.rating - a.rating).slice(0, 5);
+  // 1. 공공데이터포털 API 호출 시도
+  try {
+    const apiResult = await searchLtcFacilities({
+      location,
+      facilityType: facilityType || '전체',
+      numOfRows: 10
+    });
+
+    if (apiResult.facilities.length > 0) {
+      facilities = apiResult.facilities;
+      totalCount = apiResult.totalCount;
+      isRealData = true;
+
+      // 예산 필터링
+      if (maxBudget) {
+        facilities = facilities.filter(f => f.monthlyFee.min <= maxBudget * 10000);
+      }
+
+      // 평점순 정렬
+      facilities = facilities.sort((a, b) => b.rating - a.rating).slice(0, 5);
+    }
+  } catch (error) {
+    console.log('API 호출 실패, Mock 데이터 사용:', error);
+  }
+
+  // 2. API 결과가 없으면 Mock 데이터 사용
+  if (facilities.length === 0) {
+    facilities = CARE_FACILITIES.filter(f => {
+      if (facilityType && facilityType !== '전체' && f.type !== facilityType) return false;
+      if (maxBudget && f.monthlyFee.min > maxBudget * 10000) return false;
+      return true;
+    });
+    facilities = facilities.sort((a, b) => b.rating - a.rating).slice(0, 5);
+    totalCount = facilities.length;
+  }
 
   return {
-    result: { facilities, totalCount: facilities.length },
+    result: {
+      facilities,
+      totalCount,
+      dataSource: isRealData ? '공공데이터포털 (국민건강보험공단)' : '샘플 데이터'
+    },
     stateUpdate: {
       nearbyFacilities: facilities,
       currentStep: 'facility_search' as const
     },
     displayData: {
       type: 'facilities',
-      title: '주변 요양시설 검색 결과',
+      title: isRealData
+        ? `📡 실시간 요양시설 검색 결과 (총 ${totalCount}개 중 상위 ${facilities.length}개)`
+        : '주변 요양시설 검색 결과',
       items: [
-        { icon: '🏢', label: '검색된 시설', value: `${facilities.length}곳`, highlight: true },
+        {
+          icon: isRealData ? '📡' : '🏢',
+          label: isRealData ? '실시간 데이터' : '검색된 시설',
+          value: `${facilities.length}곳${isRealData ? ` (전체 ${totalCount}개)` : ''}`,
+          highlight: true
+        },
         ...facilities.slice(0, 4).map(f => ({
           icon: f.type === '주간보호센터' ? '🌞' : '🏥',
           label: f.name,

@@ -7,6 +7,17 @@ import { TypingIndicator } from './TypingIndicator';
 import { Button } from '@/components/ui/button';
 import { Send, RotateCcw, Loader2, AlertCircle } from 'lucide-react';
 
+// 마크다운 볼드(**텍스트**)를 HTML로 변환하는 함수
+function renderMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index} className="font-bold">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
 export function AgentChatInterface() {
   const { state, sendMessage, resetConversation } = useCare();
   const { messages, isLoading, error } = state;
@@ -40,7 +51,7 @@ export function AgentChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-gray-100 rounded-2xl overflow-hidden">
+    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-gray-100 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex items-center gap-4">
         <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">
@@ -110,7 +121,7 @@ export function AgentChatInterface() {
                 }`}
               >
                 <p className="whitespace-pre-line text-[15px] leading-relaxed">
-                  {message.content}
+                  {renderMarkdown(message.content)}
                 </p>
               </div>
 
