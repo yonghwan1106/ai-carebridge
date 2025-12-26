@@ -268,18 +268,6 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Instructions for Video Mode */}
-      {mode === 'video' && (
-        <div className="bg-amber-50 border-t border-amber-200 px-6 py-4">
-          <div className="max-w-4xl mx-auto flex items-center gap-4">
-            <CheckCircle2 className="w-5 h-5 text-amber-600" />
-            <p className="text-amber-800 text-sm">
-              <strong>녹화 방법:</strong> Win+G (Xbox Game Bar) 또는 OBS로 화면을 녹화하세요.
-              [재생] 버튼을 클릭하면 2분 동안 시나리오가 자동 재생됩니다.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
