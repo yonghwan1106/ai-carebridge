@@ -7,9 +7,13 @@ import { TypingIndicator } from './TypingIndicator';
 import { Button } from '@/components/ui/button';
 import { Send, RotateCcw, Loader2, AlertCircle } from 'lucide-react';
 
-// 마크다운 볼드(**텍스트**)를 HTML로 변환하는 함수
+// 마크다운을 HTML로 변환하는 함수 (### 제거 포함)
 function renderMarkdown(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  // 먼저 ### 마크다운 헤딩 제거 (줄 시작의 #들)
+  let cleanedText = text.replace(/^#{1,6}\s*/gm, '');
+
+  // 볼드 처리
+  const parts = cleanedText.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={index} className="font-bold">{part.slice(2, -2)}</strong>;
