@@ -51,7 +51,7 @@ export default function FacilitiesPage() {
 
 function FacilitiesContent() {
   const { state } = useCare();
-  const { nearbyFacilities, favoriteFacilities, compareFacilities } = state.careState;
+  const { favoriteFacilities, compareFacilities } = state.careState;
 
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('grid');
   const [showCompare, setShowCompare] = useState(false);
@@ -63,7 +63,7 @@ function FacilitiesContent() {
   const [facilities, setFacilities] = useState<CareFacility[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const [debugInfo, setDebugInfo] = useState<string>('페이지 로드됨');
+  const [debugInfo, setDebugInfo] = useState<string>('v3-초기화');
 
   // 시도 변경 시 시군구 초기화
   const handleSidoChange = (sido: string) => {
