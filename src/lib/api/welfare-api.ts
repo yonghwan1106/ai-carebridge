@@ -7,43 +7,42 @@ const CENTRAL_WELFARE_API = 'https://apis.data.go.kr/B554287/NationalWelfareInfo
 const LOCAL_WELFARE_API = 'https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations';
 
 import type { WelfareBenefit } from '@/types/care';
+import { XMLParser } from 'fast-xml-parser';
 
-// API 응답 타입 정의
-interface WelfareServiceResponse {
-  response: {
-    header: {
-      resultCode: string;
-      resultMsg: string;
-    };
-    body: {
-      items: {
-        item: WelfareServiceItem[] | WelfareServiceItem;
-      };
-      numOfRows: number;
-      pageNo: number;
-      totalCount: number;
-    };
+const xmlParser = new XMLParser();
+
+// API 응답 타입 정의 (XML 파싱 후 구조)
+interface WelfareAPIResponse {
+  wantedList: {
+    totalCount: number;
+    pageNo: number;
+    numOfRows: number;
+    resultCode: string;
+    resultMessage: string;
+    servList?: WelfareServiceItem[] | WelfareServiceItem;
   };
 }
 
 interface WelfareServiceItem {
-  servId: string;           // 서비스ID
-  servNm: string;           // 서비스명
-  servDgst: string;         // 서비스요약
-  jurMnofNm?: string;       // 소관부처명
-  jurOrgNm?: string;        // 소관조직명
-  trgterIndvdlNm?: string;  // 지원대상
-  slctCritNm?: string;      // 선정기준
-  alwServCn?: string;       // 급여서비스내용
-  applmetNm?: string;       // 신청방법
-  applUrl?: string;         // 신청URL
-  inqplCtadrList?: string;  // 문의처
-  servDtlLink?: string;     // 상세링크
-  ctpvNm?: string;          // 시도명 (지자체)
-  sggNm?: string;           // 시군구명 (지자체)
-  lifeNmArray?: string;     // 생애주기
-  intrsThemaNmArray?: string; // 관심주제
-  lastModYmd?: string;      // 최종수정일
+  servId: string;              // 서비스ID
+  servNm: string;              // 서비스명
+  servDgst?: string;           // 서비스요약
+  jurMnofNm?: string;          // 소관부처명
+  jurOrgNm?: string;           // 소관조직명
+  trgterIndvdlArray?: string;  // 지원대상 (배열 형태 문자열)
+  slctCritNm?: string;         // 선정기준
+  alwServCn?: string;          // 급여서비스내용
+  applmetNm?: string;          // 신청방법
+  applUrl?: string;            // 신청URL
+  rprsCtadr?: string;          // 대표연락처
+  servDtlLink?: string;        // 상세링크
+  ctpvNm?: string;             // 시도명 (지자체)
+  sggNm?: string;              // 시군구명 (지자체)
+  lifeArray?: string;          // 생애주기 (배열 형태 문자열)
+  intrsThemaArray?: string;    // 관심주제 (배열 형태 문자열)
+  onapPsbltYn?: string;        // 온라인신청가능여부
+  sprtCycNm?: string;          // 지원주기명
+  srvPvsnNm?: string;          // 서비스제공유형명
 }
 
 // 생애주기 코드 매핑
@@ -87,14 +86,15 @@ export async function searchCentralWelfareServices(params: {
 
   const queryParams = new URLSearchParams({
     serviceKey: apiKey,
+    callTp: 'L',              // L: 목록조회, D: 상세조회
     pageNo: String(pageNo),
     numOfRows: String(numOfRows),
-    _type: 'json'
+    srchKeyCode: '003'        // 001: 제목, 002: 내용, 003: 제목+내용
   });
 
-  // 생애주기 필터
+  // 생애주기 필터 (lifeArray)
   if (lifeNm && LIFE_CYCLE_CODES[lifeNm]) {
-    queryParams.append('lifeNmArray', lifeNm);
+    queryParams.append('lifeArray', LIFE_CYCLE_CODES[lifeNm]);
   }
 
   // 검색어
@@ -103,31 +103,34 @@ export async function searchCentralWelfareServices(params: {
   }
 
   try {
-    // NationalWelfareInformationsV001 API 사용
-    const url = `${CENTRAL_WELFARE_API}/getServList?${queryParams.toString()}`;
+    // NationalWelfarelistV001 오퍼레이션 사용 (XML 응답)
+    const url = `${CENTRAL_WELFARE_API}/NationalWelfarelistV001?${queryParams.toString()}`;
     console.log('중앙부처 복지서비스 API 호출:', url.replace(apiKey, 'API_KEY'));
 
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' }
-    });
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`API 응답 오류: ${response.status}`);
     }
 
-    const data = await response.json();
+    // XML 응답 파싱
+    const xmlText = await response.text();
+    const data: WelfareAPIResponse = xmlParser.parse(xmlText);
 
     // 응답 구조 확인
-    if (!data.response?.body?.items?.item) {
+    if (!data.wantedList?.servList) {
+      console.log('복지서비스 응답 없음:', data.wantedList?.resultMessage);
       return { services: [], totalCount: 0 };
     }
 
-    const items = data.response.body.items.item;
+    const items = data.wantedList.servList;
     const itemArray = Array.isArray(items) ? items : [items];
+
+    console.log(`복지서비스 ${itemArray.length}건 조회 (전체 ${data.wantedList.totalCount}건)`);
 
     return {
       services: itemArray,
-      totalCount: data.response.body.totalCount || itemArray.length
+      totalCount: data.wantedList.totalCount || itemArray.length
     };
 
   } catch (error) {
@@ -276,11 +279,11 @@ export async function searchWelfareServices(params: {
     name: svc.servNm,
     category: inferCategory(svc),
     description: svc.servDgst || svc.alwServCn || '',
-    eligibility: parseEligibility(svc.trgterIndvdlNm, svc.slctCritNm),
+    eligibility: parseEligibility(svc.trgterIndvdlArray, svc.slctCritNm),
     monthlyAmount: estimateAmount(svc),
     applicationUrl: svc.applUrl || svc.servDtlLink,
     agency: svc.jurMnofNm || svc.jurOrgNm || '관할 지자체',
-    phone: svc.inqplCtadrList?.split(',')[0]?.trim()
+    phone: svc.rprsCtadr ? String(svc.rprsCtadr).split(',')[0]?.trim() : undefined
   }));
 
   return { benefits, totalCount, isRealData };
@@ -320,7 +323,7 @@ function extractSidoName(region: string): string | undefined {
 }
 
 function inferCategory(svc: WelfareServiceItem): WelfareBenefit['category'] {
-  const text = `${svc.servNm} ${svc.servDgst || ''} ${svc.intrsThemaNmArray || ''}`.toLowerCase();
+  const text = `${svc.servNm} ${svc.servDgst || ''} ${svc.intrsThemaArray || ''}`.toLowerCase();
 
   if (text.includes('돌봄') || text.includes('요양') || text.includes('간병')) {
     return '돌봄서비스';
