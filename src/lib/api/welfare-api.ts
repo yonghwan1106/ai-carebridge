@@ -1,6 +1,10 @@
-// 복지로 복지서비스 API 연동
-// 중앙부처복지서비스: https://www.data.go.kr/data/15090532/openapi.do
-// 지자체복지서비스: https://www.data.go.kr/data/15108347/openapi.do
+// 복지로 복지서비스 API 연동 (승인됨: 2025-12-27 ~ 2027-12-27)
+// 중앙부처복지서비스: https://apis.data.go.kr/B554287/NationalWelfareInformationsV001
+// 지자체복지서비스: https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations
+
+// API Base URLs
+const CENTRAL_WELFARE_API = 'https://apis.data.go.kr/B554287/NationalWelfareInformationsV001';
+const LOCAL_WELFARE_API = 'https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations';
 
 import type { WelfareBenefit } from '@/types/care';
 
@@ -99,7 +103,8 @@ export async function searchCentralWelfareServices(params: {
   }
 
   try {
-    const url = `http://apis.data.go.kr/B554287/NationalWelfareInformationService/NationalWelfareInformationServiceList?${queryParams.toString()}`;
+    // NationalWelfareInformationsV001 API 사용
+    const url = `${CENTRAL_WELFARE_API}/getServList?${queryParams.toString()}`;
     console.log('중앙부처 복지서비스 API 호출:', url.replace(apiKey, 'API_KEY'));
 
     const response = await fetch(url, {
@@ -167,7 +172,8 @@ export async function searchLocalWelfareServices(params: {
   }
 
   try {
-    const url = `http://apis.data.go.kr/B554287/LocalGovernmentWelfareInformationService/LcgvWelfarelist?${queryParams.toString()}`;
+    // LocalGovernmentWelfareInformations API 사용
+    const url = `${LOCAL_WELFARE_API}/LcgvWelfarelist?${queryParams.toString()}`;
     console.log('지자체 복지서비스 API 호출:', url.replace(apiKey, 'API_KEY'));
 
     const response = await fetch(url, {
