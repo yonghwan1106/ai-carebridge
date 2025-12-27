@@ -25,18 +25,24 @@ export async function POST(request: Request) {
         numOfRows
       });
 
-      return NextResponse.json({
-        facilities: result.facilities,
-        totalCount: result.totalCount,
-        isRealData: true,
-        dataSource: '공공데이터포털 (국민건강보험공단)'
-      });
+      // API 결과가 있으면 반환
+      if (result.facilities.length > 0) {
+        return NextResponse.json({
+          facilities: result.facilities,
+          totalCount: result.totalCount,
+          isRealData: true,
+          dataSource: '공공데이터포털 (국민건강보험공단)'
+        });
+      }
+
+      // API 결과가 없으면 Mock 데이터로 폴백
+      throw new Error('API 결과 없음, Mock 데이터 사용');
 
     } catch (apiError) {
-      console.error('API 호출 실패, Mock 데이터 반환:', apiError);
+      console.log('API 호출 실패 또는 결과 없음, Mock 데이터 반환');
 
       // Mock 데이터 폴백
-      let mockFacilities = CARE_FACILITIES;
+      let mockFacilities = [...CARE_FACILITIES];
 
       if (facilityType && facilityType !== '전체') {
         mockFacilities = mockFacilities.filter(f => f.type === facilityType);
