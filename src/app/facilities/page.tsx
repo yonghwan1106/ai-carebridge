@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, MapPin, List, Grid, Heart, GitCompare, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FacilityCard, FacilityMap, FacilityCompare } from '@/components/facility';
@@ -61,8 +61,10 @@ function FacilitiesContent() {
   const [selectedType, setSelectedType] = useState('전체');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [facilities, setFacilities] = useState<CareFacility[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // 시작부터 로딩 상태
   const [totalCount, setTotalCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<string>('초기화 중...');
+  const [hasMounted, setHasMounted] = useState(false);
 
   // 시도 변경 시 시군구 초기화
   const handleSidoChange = (sido: string) => {
@@ -70,9 +72,10 @@ function FacilitiesContent() {
     setSelectedSigungu('전체');
   };
 
-  // API에서 시설 검색
+  // API에서 시설 검색 (검색 버튼 클릭 시)
   const searchFacilities = async () => {
     setIsLoading(true);
+    setDebugInfo('검색 중...');
     try {
       const response = await fetch('/api/facilities', {
         method: 'POST',
@@ -90,58 +93,75 @@ function FacilitiesContent() {
         const data = await response.json();
         setFacilities(data.facilities || []);
         setTotalCount(data.totalCount || 0);
+        setDebugInfo(`검색 완료: ${data.totalCount}개 (${data.isRealData ? '실제' : '샘플'})`);
+      } else {
+        setDebugInfo(`검색 오류: HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error('시설 검색 오류:', error);
-      setFacilities(nearbyFacilities || []);
+      setFacilities([]);
+      setDebugInfo(`검색 오류: ${error instanceof Error ? error.message : '알 수 없음'}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 초기 로드 및 필터 변경 시 검색
+  // 클라이언트 마운트 확인
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const requestBody = {
-          location: selectedSido,
-          sigungu: selectedSigungu === '전체' ? undefined : selectedSigungu,
-          facilityType: selectedType === '전체' ? undefined : selectedType,
-          numOfRows: 50
-        };
-        console.log('[Facilities] Fetching with:', requestBody);
+    setHasMounted(true);
+    setDebugInfo('컴포넌트 마운트됨');
+  }, []);
 
-        const response = await fetch('/api/facilities', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
-        });
+  // 데이터 fetching 함수
+  const fetchFacilities = useCallback(async () => {
+    if (!hasMounted) return;
 
-        console.log('[Facilities] Response status:', response.status);
+    setIsLoading(true);
+    setDebugInfo('데이터 로딩 중...');
 
-        const data = await response.json();
-        console.log('[Facilities] Data received:', data.totalCount, 'facilities');
+    try {
+      const requestBody = {
+        location: selectedSido,
+        sigungu: selectedSigungu === '전체' ? undefined : selectedSigungu,
+        facilityType: selectedType === '전체' ? undefined : selectedType,
+        numOfRows: 50
+      };
 
-        if (data.facilities && Array.isArray(data.facilities)) {
-          setFacilities(data.facilities);
-          setTotalCount(data.totalCount || data.facilities.length);
-        } else {
-          console.error('[Facilities] Invalid data format:', data);
-          setFacilities([]);
-          setTotalCount(0);
-        }
-      } catch (error) {
-        console.error('[Facilities] 검색 오류:', error);
+      const response = await fetch('/api/facilities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.facilities && Array.isArray(data.facilities)) {
+        setFacilities(data.facilities);
+        setTotalCount(data.totalCount || data.facilities.length);
+        setDebugInfo(`${data.totalCount}개 시설 로드 완료 (${data.isRealData ? '실제 데이터' : '샘플'})`);
+      } else {
         setFacilities([]);
         setTotalCount(0);
-      } finally {
-        setIsLoading(false);
+        setDebugInfo('데이터 형식 오류');
       }
-    };
+    } catch (error) {
+      setFacilities([]);
+      setTotalCount(0);
+      setDebugInfo(`오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hasMounted, selectedSido, selectedSigungu, selectedType]);
 
-    fetchData();
-  }, [selectedSido, selectedSigungu, selectedType]);
+  // 초기 로드 및 필터 변경 시 검색
+  useEffect(() => {
+    if (hasMounted) {
+      fetchFacilities();
+    }
+  }, [hasMounted, fetchFacilities]);
 
   // 필터링된 시설 목록
   const filteredFacilities = facilities.filter(f => {
@@ -168,7 +188,14 @@ function FacilitiesContent() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold">요양시설 탐색</h1>
-              <p className="text-blue-100 text-sm">전국 {totalCount.toLocaleString()}개 시설 정보</p>
+              <p className="text-blue-100 text-sm">
+                전국 {totalCount.toLocaleString()}개 시설 정보
+                {process.env.NODE_ENV === 'development' && ` | ${debugInfo}`}
+              </p>
+              {/* 디버그: 항상 표시 (문제 해결 후 제거) */}
+              <p className="text-blue-200 text-xs mt-1">
+                상태: {isLoading ? '로딩중' : '완료'} | 결과: {facilities.length}개 | {debugInfo}
+              </p>
             </div>
           </div>
 
