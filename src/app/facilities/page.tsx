@@ -72,8 +72,34 @@ function FacilitiesContent() {
 
   // 초기 로드 및 필터 변경 시 검색
   useEffect(() => {
-    searchFacilities();
-  }, [selectedSido, selectedType]);
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/facilities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: selectedSido,
+            facilityType: selectedType === '전체' ? undefined : selectedType,
+            query: searchQuery
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setFacilities(data.facilities || []);
+          setTotalCount(data.totalCount || 0);
+        }
+      } catch (error) {
+        console.error('시설 검색 오류:', error);
+        setFacilities([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedSido, selectedType, searchQuery]);
 
   // 필터링된 시설 목록
   const filteredFacilities = facilities.filter(f => {
