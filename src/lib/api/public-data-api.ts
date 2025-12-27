@@ -165,7 +165,9 @@ function extractSigungu(location: string): string | undefined {
  */
 export async function searchLtcFacilities(params: {
   location: string;
+  sigungu?: string;
   facilityType?: string;
+  query?: string;
   pageNo?: number;
   numOfRows?: number;
 }): Promise<{ facilities: CareFacility[]; totalCount: number }> {
@@ -176,7 +178,7 @@ export async function searchLtcFacilities(params: {
     return { facilities: [], totalCount: 0 };
   }
 
-  const { location, facilityType = '전체', pageNo = 1, numOfRows = 10 } = params;
+  const { location, sigungu, facilityType = '전체', query, pageNo = 1, numOfRows = 10 } = params;
 
   // 쿼리 파라미터 구성
   const queryParams = new URLSearchParams({
@@ -192,10 +194,19 @@ export async function searchLtcFacilities(params: {
     queryParams.append('siDoCd', sidoCode);
   }
 
-  // 시군구명 추가
-  const sigungu = extractSigungu(location);
+  // 시군구 추가 (직접 전달된 경우 우선, 없으면 location에서 추출)
   if (sigungu) {
     queryParams.append('siGunGuNm', sigungu);
+  } else {
+    const extractedSigungu = extractSigungu(location);
+    if (extractedSigungu) {
+      queryParams.append('siGunGuNm', extractedSigungu);
+    }
+  }
+
+  // 기관명 검색어 추가
+  if (query) {
+    queryParams.append('adminNm', query);
   }
 
   // 급여종류 코드 추가

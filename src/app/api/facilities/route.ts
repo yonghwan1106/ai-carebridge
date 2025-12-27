@@ -5,7 +5,7 @@ import { CARE_FACILITIES } from '@/lib/mock-data/care-facilities';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { location, facilityType, query, facilityId, pageNo = 1, numOfRows = 20 } = body;
+    const { location, sigungu, facilityType, query, facilityId, pageNo = 1, numOfRows = 20 } = body;
 
     // 특정 시설 상세 조회
     if (facilityId) {
@@ -20,7 +20,9 @@ export async function POST(request: Request) {
     try {
       const result = await searchLtcFacilities({
         location: location || '서울',
+        sigungu: sigungu || undefined,
         facilityType: facilityType || '전체',
+        query: query || undefined,
         pageNo,
         numOfRows
       });
@@ -75,7 +77,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const facilityId = searchParams.get('id');
   const location = searchParams.get('location') || '서울';
+  const sigungu = searchParams.get('sigungu') || undefined;
   const facilityType = searchParams.get('type') || '전체';
+  const query = searchParams.get('query') || undefined;
   const pageNo = parseInt(searchParams.get('page') || '1');
   const numOfRows = parseInt(searchParams.get('limit') || '20');
 
@@ -97,7 +101,9 @@ export async function GET(request: Request) {
   try {
     const result = await searchLtcFacilities({
       location,
+      sigungu,
       facilityType,
+      query,
       pageNo,
       numOfRows
     });
