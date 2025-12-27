@@ -226,15 +226,23 @@ export async function searchLtcFacilities(params: {
       throw new Error('API 응답이 비어 있습니다');
     }
 
-    // XML이 아닌 경우 (HTML 에러 페이지 등)
-    const isXml = xmlText.startsWith('<?xml') || xmlText.startsWith('<response');
-    if (!isXml) {
+    // JSON 또는 XML 응답 파싱
+    let data: LtcInsttSearchResponse;
+
+    if (xmlText.startsWith('{')) {
+      // JSON 응답
+      console.log('[LTC API] JSON 응답 파싱');
+      data = JSON.parse(xmlText);
+    } else if (xmlText.startsWith('<?xml') || xmlText.startsWith('<response')) {
+      // XML 응답
+      console.log('[LTC API] XML 응답 파싱');
+      data = xmlParser.parse(xmlText);
+    } else {
       const preview = xmlText.substring(0, 500);
-      console.log('[LTC API] XML이 아닌 응답:', preview);
-      throw new Error(`API 응답이 XML 형식이 아닙니다: ${preview.substring(0, 100)}`);
+      console.log('[LTC API] 알 수 없는 응답 형식:', preview);
+      throw new Error(`알 수 없는 API 응답 형식: ${preview.substring(0, 100)}`);
     }
 
-    const data = xmlParser.parse(xmlText);
     console.log('[LTC API] 파싱된 구조 키:', data ? Object.keys(data) : 'null');
 
     // 응답 구조 확인
