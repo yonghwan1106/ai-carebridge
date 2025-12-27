@@ -171,9 +171,6 @@ export async function searchLtcFacilities(params: {
 }): Promise<{ facilities: CareFacility[]; totalCount: number }> {
   const apiKey = process.env.PUBLIC_DATA_API_KEY;
 
-  console.log('[LTC API] API Key exists:', !!apiKey);
-  console.log('[LTC API] API Key length:', apiKey?.length || 0);
-
   if (!apiKey) {
     console.warn('[LTC API] PUBLIC_DATA_API_KEY가 설정되지 않았습니다.');
     return { facilities: [], totalCount: 0 };
@@ -209,63 +206,43 @@ export async function searchLtcFacilities(params: {
 
   try {
     const url = `${BASE_URL}/searchLtcInsttService02/getLtcInsttSeachList02?${queryParams.toString()}`;
-    console.log('[LTC API] 호출 URL:', url.replace(apiKey, 'API_KEY'));
-
     const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`API 응답 오류: ${response.status}`);
     }
 
-    // XML 응답 파싱
-    const xmlText = await response.text();
-    console.log('[LTC API] 응답 Content-Type:', response.headers.get('content-type'));
-    console.log('[LTC API] XML 응답 길이:', xmlText?.length || 0);
-
-    if (!xmlText || xmlText.length === 0) {
+    const responseText = await response.text();
+    if (!responseText || responseText.length === 0) {
       throw new Error('API 응답이 비어 있습니다');
     }
 
     // JSON 또는 XML 응답 파싱
     let data: LtcInsttSearchResponse;
 
-    if (xmlText.startsWith('{')) {
-      // JSON 응답
-      console.log('[LTC API] JSON 응답 파싱');
-      data = JSON.parse(xmlText);
-    } else if (xmlText.startsWith('<?xml') || xmlText.startsWith('<response')) {
+    if (responseText.startsWith('{')) {
+      // JSON 응답 (_type=json)
+      data = JSON.parse(responseText);
+    } else if (responseText.startsWith('<?xml') || responseText.startsWith('<response')) {
       // XML 응답
-      console.log('[LTC API] XML 응답 파싱');
-      data = xmlParser.parse(xmlText);
+      data = xmlParser.parse(responseText);
     } else {
-      const preview = xmlText.substring(0, 500);
-      console.log('[LTC API] 알 수 없는 응답 형식:', preview);
-      throw new Error(`알 수 없는 API 응답 형식: ${preview.substring(0, 100)}`);
+      throw new Error('알 수 없는 API 응답 형식');
     }
-
-    console.log('[LTC API] 파싱된 구조 키:', data ? Object.keys(data) : 'null');
 
     // 응답 구조 확인
-    if (!data || !data.response) {
-      console.log('[LTC API] data.response가 없습니다. data:', JSON.stringify(data).substring(0, 300));
-      throw new Error('XML 파싱 결과에 response가 없습니다');
+    if (!data?.response) {
+      throw new Error('API 응답 구조가 올바르지 않습니다');
     }
 
-    const responseData = data.response;
-    const header = responseData.header;
-    const body = responseData.body;
+    const { header, body } = data.response;
 
-    console.log('[LTC API] header:', header ? JSON.stringify(header) : 'no header');
-    console.log('[LTC API] body keys:', body ? Object.keys(body) : 'no body');
-
-    if (header && header.resultCode !== '00') {
-      throw new Error(`API 오류: ${header.resultMsg}`);
+    if (header?.resultCode !== '00') {
+      throw new Error(`API 오류: ${header?.resultMsg || '알 수 없는 오류'}`);
     }
 
     const items = body?.items?.item;
     if (!items) {
-      const bodyStr = JSON.stringify(body) || 'undefined';
-      console.log('[LTC API] items가 없습니다. body:', bodyStr.substring(0, Math.min(500, bodyStr.length)));
       return { facilities: [], totalCount: 0 };
     }
 
@@ -307,7 +284,6 @@ export async function searchLtcFacilities(params: {
 
   } catch (error) {
     console.error('[LTC API] 장기요양기관 검색 API 오류:', error);
-    console.error('[LTC API] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     throw error;
   }
 }
