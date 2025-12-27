@@ -11,7 +11,10 @@ const initialCareState: CareState = {
   appointments: [],
   familyEvents: [],
   currentStep: 'initial',
-  completedSteps: []
+  completedSteps: [],
+  favoriteFacilities: [],
+  compareFacilities: [],
+  selectedFacility: undefined
 };
 
 // 초기 대화
@@ -46,7 +49,11 @@ type AppAction =
   | { type: 'ADD_USER_MESSAGE'; payload: string }
   | { type: 'ADD_AGENT_MESSAGE'; payload: { content: string; toolResults?: AgentMessage['toolResults'] } }
   | { type: 'UPDATE_CARE_STATE'; payload: Partial<CareState> }
-  | { type: 'RESET_CONVERSATION' };
+  | { type: 'RESET_CONVERSATION' }
+  | { type: 'TOGGLE_FAVORITE'; payload: string }
+  | { type: 'TOGGLE_COMPARE'; payload: string }
+  | { type: 'CLEAR_COMPARE' }
+  | { type: 'SELECT_FACILITY'; payload: CareState['selectedFacility'] };
 
 // 리듀서
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -106,6 +113,58 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ]
       };
 
+    case 'TOGGLE_FAVORITE': {
+      const facilityId = action.payload;
+      const currentFavorites = state.careState.favoriteFacilities || [];
+      const isFavorite = currentFavorites.includes(facilityId);
+      return {
+        ...state,
+        careState: {
+          ...state.careState,
+          favoriteFacilities: isFavorite
+            ? currentFavorites.filter(id => id !== facilityId)
+            : [...currentFavorites, facilityId]
+        }
+      };
+    }
+
+    case 'TOGGLE_COMPARE': {
+      const facilityId = action.payload;
+      const currentCompare = state.careState.compareFacilities || [];
+      const isComparing = currentCompare.includes(facilityId);
+      // 최대 3개까지만 비교 가능
+      if (!isComparing && currentCompare.length >= 3) {
+        return state;
+      }
+      return {
+        ...state,
+        careState: {
+          ...state.careState,
+          compareFacilities: isComparing
+            ? currentCompare.filter(id => id !== facilityId)
+            : [...currentCompare, facilityId]
+        }
+      };
+    }
+
+    case 'CLEAR_COMPARE':
+      return {
+        ...state,
+        careState: {
+          ...state.careState,
+          compareFacilities: []
+        }
+      };
+
+    case 'SELECT_FACILITY':
+      return {
+        ...state,
+        careState: {
+          ...state.careState,
+          selectedFacility: action.payload
+        }
+      };
+
     default:
       return state;
   }
@@ -117,6 +176,10 @@ const CareContext = createContext<{
   dispatch: Dispatch<AppAction>;
   sendMessage: (message: string) => Promise<void>;
   resetConversation: () => void;
+  toggleFavorite: (facilityId: string) => void;
+  toggleCompare: (facilityId: string) => void;
+  clearCompare: () => void;
+  selectFacility: (facility: CareState['selectedFacility']) => void;
 } | null>(null);
 
 // Provider 컴포넌트
@@ -184,8 +247,37 @@ export function CareProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'RESET_CONVERSATION' });
   };
 
+  // 즐겨찾기 토글
+  const toggleFavorite = (facilityId: string) => {
+    dispatch({ type: 'TOGGLE_FAVORITE', payload: facilityId });
+  };
+
+  // 비교 토글
+  const toggleCompare = (facilityId: string) => {
+    dispatch({ type: 'TOGGLE_COMPARE', payload: facilityId });
+  };
+
+  // 비교 목록 초기화
+  const clearCompare = () => {
+    dispatch({ type: 'CLEAR_COMPARE' });
+  };
+
+  // 시설 선택 (상세 보기)
+  const selectFacility = (facility: CareState['selectedFacility']) => {
+    dispatch({ type: 'SELECT_FACILITY', payload: facility });
+  };
+
   return (
-    <CareContext.Provider value={{ state, dispatch, sendMessage, resetConversation }}>
+    <CareContext.Provider value={{
+      state,
+      dispatch,
+      sendMessage,
+      resetConversation,
+      toggleFavorite,
+      toggleCompare,
+      clearCompare,
+      selectFacility
+    }}>
       {children}
     </CareContext.Provider>
   );

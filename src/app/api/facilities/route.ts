@@ -1,0 +1,91 @@
+import { NextResponse } from 'next/server';
+import { searchLtcFacilities, getLtcFacilityDetail } from '@/lib/api/public-data-api';
+import { CARE_FACILITIES } from '@/lib/mock-data/care-facilities';
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { location, facilityType, query, facilityId, pageNo = 1, numOfRows = 20 } = body;
+
+    // 특정 시설 상세 조회
+    if (facilityId) {
+      const detail = await getLtcFacilityDetail(facilityId);
+      if (detail) {
+        return NextResponse.json({ detail });
+      }
+      return NextResponse.json({ error: '시설을 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 시설 목록 검색
+    try {
+      const result = await searchLtcFacilities({
+        location: location || '서울',
+        facilityType: facilityType || '전체',
+        pageNo,
+        numOfRows
+      });
+
+      return NextResponse.json({
+        facilities: result.facilities,
+        totalCount: result.totalCount,
+        isRealData: true,
+        dataSource: '공공데이터포털 (국민건강보험공단)'
+      });
+
+    } catch (apiError) {
+      console.error('API 호출 실패, Mock 데이터 반환:', apiError);
+
+      // Mock 데이터 폴백
+      let mockFacilities = CARE_FACILITIES;
+
+      if (facilityType && facilityType !== '전체') {
+        mockFacilities = mockFacilities.filter(f => f.type === facilityType);
+      }
+
+      if (query) {
+        mockFacilities = mockFacilities.filter(f =>
+          f.name.includes(query) || f.address.includes(query)
+        );
+      }
+
+      return NextResponse.json({
+        facilities: mockFacilities,
+        totalCount: mockFacilities.length,
+        isRealData: false,
+        dataSource: '샘플 데이터'
+      });
+    }
+
+  } catch (error) {
+    console.error('시설 검색 API 오류:', error);
+    return NextResponse.json(
+      { error: '시설 검색 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const facilityId = searchParams.get('id');
+
+  if (facilityId) {
+    try {
+      const detail = await getLtcFacilityDetail(facilityId);
+      if (detail) {
+        return NextResponse.json({ detail });
+      }
+      return NextResponse.json({ error: '시설을 찾을 수 없습니다.' }, { status: 404 });
+    } catch (error) {
+      console.error('시설 상세 조회 오류:', error);
+      return NextResponse.json({ error: '조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+  }
+
+  // 기본 목록 반환
+  return NextResponse.json({
+    facilities: CARE_FACILITIES,
+    totalCount: CARE_FACILITIES.length,
+    isRealData: false
+  });
+}

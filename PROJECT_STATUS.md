@@ -28,8 +28,11 @@
 carebridge/
 ├── src/
 │   ├── app/
-│   │   ├── api/chat/route.ts    # Claude API 연동
-│   │   ├── page.tsx             # 메인 페이지
+│   │   ├── api/
+│   │   │   ├── chat/route.ts       # Claude API 연동
+│   │   │   └── facilities/route.ts # 시설 검색 API
+│   │   ├── facilities/page.tsx     # 시설 탐색 페이지 (NEW)
+│   │   ├── page.tsx                # 메인 페이지
 │   │   └── layout.tsx
 │   ├── components/
 │   │   ├── chat/
@@ -38,20 +41,25 @@ carebridge/
 │   │   │   ├── ChatMessage.tsx
 │   │   │   ├── ToolResultCard.tsx      # 도구 실행 결과 카드
 │   │   │   └── TypingIndicator.tsx     # 로딩 표시
+│   │   ├── facility/                   # 시설 관련 컴포넌트 (NEW)
+│   │   │   ├── FacilityCard.tsx        # 시설 카드 (즐겨찾기/비교)
+│   │   │   ├── FacilityMap.tsx         # Leaflet 지도
+│   │   │   ├── FacilityCompare.tsx     # 시설 비교 테이블
+│   │   │   └── index.ts
 │   │   └── ui/                  # shadcn/ui 컴포넌트
 │   ├── lib/
 │   │   ├── ai-agent/
-│   │   │   ├── tools.ts         # 9개 AI 도구 정의 및 핸들러
+│   │   │   ├── tools.ts         # 10개 AI 도구 정의 및 핸들러
 │   │   │   ├── system-prompt.ts # 시스템 프롬프트
 │   │   │   └── types.ts
 │   │   ├── api/
 │   │   │   ├── public-data-api.ts  # 공공데이터포털 API (시설검색)
 │   │   │   └── welfare-api.ts      # 복지서비스 API (실시간)
 │   │   ├── context/
-│   │   │   └── CareContext.tsx  # 상태 관리
+│   │   │   └── CareContext.tsx  # 상태 관리 (즐겨찾기/비교 기능 추가)
 │   │   └── mock-data/           # 샘플 데이터 (폴백용)
 │   └── types/
-│       └── care.ts              # 타입 정의
+│       └── care.ts              # 타입 정의 (FacilityDetailInfo 추가)
 ├── .env.local                   # API 키 설정
 └── package.json
 ```
@@ -96,15 +104,26 @@ carebridge/
 
 ---
 
-### 2.4 돌봄자원 연결 ✅ 완료 (실시간 API)
+### 2.4 돌봄자원 연결 ✅ 완료 (실시간 API + 고도화)
 | 항목 | 상태 | 설명 |
 |------|------|------|
-| 도구 정의 | ✅ | `search_care_facilities`, `register_emergency_care` |
+| 도구 정의 | ✅ | `search_care_facilities`, `get_facility_detail`, `register_emergency_care` |
 | 핸들러 구현 | ✅ | 공공데이터포털 API 연동 |
-| UI 표시 | ✅ | 시설 목록 카드 |
+| UI 표시 | ✅ | 시설 목록 카드 + 상세 정보 |
 | 데이터 | ✅ 실시간 | **전국 9만+ 시설** |
+| 지도 연동 | ✅ | Leaflet 지도 시각화 |
+| 즐겨찾기 | ✅ | 관심 시설 저장 기능 |
+| 비교 기능 | ✅ | 최대 3개 시설 비교 테이블 |
+| 탐색 페이지 | ✅ | `/facilities` 전용 페이지 |
 
 **작동 확인**: 서울시 6,216개 시설 검색 성공
+
+**v1.5 신규 기능**:
+- 시설 상세 조회 (정원/현원, 종사자수, 홈페이지 등)
+- Leaflet 기반 지도 시각화
+- 시설 즐겨찾기 기능
+- 시설 비교 기능 (최대 3개)
+- 시설 탐색 전용 페이지 (/facilities)
 
 ---
 
@@ -209,16 +228,17 @@ PUBLIC_DATA_API_KEY=S1kBo55wOyrX9FdzDMbXL4blXSOj+mYuvk2s++w5iTb+a7Uu3NWwqPjz6wv7
 |---------|------|----------|
 | 🟢 완료 | ~~복지서비스 API 신청 (중앙부처 + 지자체)~~ | ✅ |
 | 🟢 완료 | ~~복지서비스 API 연동 테스트~~ | ✅ |
-| 🟡 중간 | 시설 상세정보 API 추가 연동 | 1시간 |
+| 🟢 완료 | ~~시설 상세정보 API 추가 연동~~ | ✅ |
 
-### 6.2 중기 작업 (추가 개발)
+### 6.2 중기 작업 (추가 개발) - ✅ 완료
 
-| 작업 | 설명 | 난이도 |
+| 작업 | 설명 | 상태 |
 |------|------|--------|
-| 시설 상세 조회 | 전화번호, 주소, 정원 등 상세 정보 | 쉬움 |
-| 지도 연동 | 카카오맵/네이버맵 시설 위치 표시 | 중간 |
-| 즐겨찾기 기능 | 관심 시설 저장 | 쉬움 |
-| 비교 기능 | 여러 시설 비교 테이블 | 중간 |
+| 시설 상세 조회 | 전화번호, 주소, 정원 등 상세 정보 | ✅ 완료 |
+| 지도 연동 | Leaflet 지도 시설 위치 표시 | ✅ 완료 |
+| 즐겨찾기 기능 | 관심 시설 저장 | ✅ 완료 |
+| 비교 기능 | 여러 시설 비교 테이블 (최대 3개) | ✅ 완료 |
+| 시설 탐색 페이지 | /facilities 페이지 신규 | ✅ 완료 |
 
 ### 6.3 장기 작업 (고도화)
 
@@ -290,6 +310,7 @@ npm start
 | 2025-12-26 | v1.2 | UI 개선 (로딩 표시, 마크다운, 전체화면) |
 | 2025-12-27 | v1.3 | 복지서비스 API 승인 및 연동 완료 |
 | 2025-12-27 | v1.4 | 마크다운 헤딩 제거, 타이핑 인디케이터 개선 |
+| 2025-12-27 | v1.5 | 시설 탐색 고도화 (상세조회, 지도, 즐겨찾기, 비교) |
 
 ---
 

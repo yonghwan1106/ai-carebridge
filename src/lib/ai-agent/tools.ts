@@ -4,7 +4,7 @@ import type { ClaudeTool, ToolHandler, ToolRegistry } from './types';
 import type { CareState, CareLevelDiagnosis, WelfareBenefit, CareFacility, Appointment } from '@/types/care';
 import { WELFARE_BENEFITS } from '@/lib/mock-data/welfare-benefits';
 import { CARE_FACILITIES } from '@/lib/mock-data/care-facilities';
-import { searchLtcFacilities } from '@/lib/api/public-data-api';
+import { searchLtcFacilities, getLtcFacilityDetail } from '@/lib/api/public-data-api';
 import { searchWelfareServices } from '@/lib/api/welfare-api';
 
 // ============================================
@@ -271,6 +271,25 @@ const summarizeProgress: ClaudeTool = {
       }
     },
     required: []
+  }
+};
+
+const getFacilityDetail: ClaudeTool = {
+  name: 'get_facility_detail',
+  description: '특정 요양시설의 상세 정보(정원, 현원, 종사자수, 프로그램 등)를 조회합니다.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      facilityId: {
+        type: 'string',
+        description: '시설 ID (장기요양기관기호)'
+      },
+      facilityName: {
+        type: 'string',
+        description: '시설명 (ID가 없을 경우)'
+      }
+    },
+    required: ['facilityId']
   }
 };
 
@@ -755,6 +774,95 @@ const handleSummarizeProgress: ToolHandler = async (input, state) => {
   };
 };
 
+const handleGetFacilityDetail: ToolHandler = async (input, state) => {
+  const { facilityId, facilityName } = input as {
+    facilityId: string;
+    facilityName?: string;
+  };
+
+  try {
+    // API에서 상세 정보 조회
+    const detail = await getLtcFacilityDetail(facilityId);
+
+    if (!detail) {
+      return {
+        result: { error: '시설 상세정보를 찾을 수 없습니다.' },
+        displayData: {
+          type: 'facilities',
+          title: '시설 상세 조회 실패',
+          items: [
+            { icon: '❌', label: '오류', value: '해당 시설 정보를 찾을 수 없습니다', highlight: true }
+          ]
+        }
+      };
+    }
+
+    // 상세 정보 구성
+    const facilityDetail = {
+      id: detail.longTermAdminSym,
+      name: detail.adminNm,
+      address: detail.ctprvnAddr,
+      phone: detail.adminTelNo,
+      homepage: detail.hmpgAddr,
+      totalCapacity: detail.totPer,
+      currentOccupancy: detail.curPer,
+      employeeCount: detail.emplyCnt,
+      representative: detail.rprsvNm,
+      establishedDate: detail.bsnStartDt,
+      programs: detail.prgmInfo ? detail.prgmInfo.split(',').map(p => p.trim()) : []
+    };
+
+    // 빈자리 계산
+    const availableSlots = facilityDetail.totalCapacity && facilityDetail.currentOccupancy
+      ? facilityDetail.totalCapacity - facilityDetail.currentOccupancy
+      : null;
+
+    return {
+      result: facilityDetail,
+      displayData: {
+        type: 'facilities',
+        title: `📋 ${facilityDetail.name} 상세정보`,
+        items: [
+          { icon: '🏢', label: '시설명', value: facilityDetail.name, highlight: true },
+          { icon: '📍', label: '주소', value: facilityDetail.address || '정보 없음' },
+          { icon: '📞', label: '전화번호', value: facilityDetail.phone || '정보 없음' },
+          { icon: '👥', label: '정원/현원', value: facilityDetail.totalCapacity
+            ? `${facilityDetail.currentOccupancy || 0}/${facilityDetail.totalCapacity}명`
+            : '정보 없음' },
+          ...(availableSlots !== null ? [{
+            icon: '✨',
+            label: '빈자리',
+            value: availableSlots > 0 ? `${availableSlots}자리 가능` : '만석',
+            highlight: availableSlots > 0
+          }] : []),
+          { icon: '👨‍⚕️', label: '종사자 수', value: facilityDetail.employeeCount
+            ? `${facilityDetail.employeeCount}명`
+            : '정보 없음' },
+          ...(facilityDetail.homepage ? [{
+            icon: '🌐',
+            label: '홈페이지',
+            value: facilityDetail.homepage,
+            highlight: false
+          }] : [])
+        ]
+      }
+    };
+
+  } catch (error) {
+    console.error('시설 상세 조회 오류:', error);
+    return {
+      result: { error: '시설 상세정보 조회 중 오류가 발생했습니다.' },
+      displayData: {
+        type: 'facilities',
+        title: '시설 상세 조회 오류',
+        items: [
+          { icon: '❌', label: '오류', value: '조회 중 문제가 발생했습니다', highlight: true }
+        ]
+      }
+    };
+  }
+};
+
 // ============================================
 // Helper Functions
 // ============================================
@@ -820,6 +928,7 @@ export const CARE_BRIDGE_TOOLS: ClaudeTool[] = [
   applyLongTermCare,
   searchWelfareBenefits,
   searchCareFacilities,
+  getFacilityDetail,
   scheduleVisitSurvey,
   registerEmergencyCare,
   shareFamilyCalendar,
@@ -832,6 +941,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   apply_long_term_care: handleApplyLongTermCare,
   search_welfare_benefits: handleSearchWelfareBenefits,
   search_care_facilities: handleSearchCareFacilities,
+  get_facility_detail: handleGetFacilityDetail,
   schedule_visit_survey: handleScheduleVisitSurvey,
   register_emergency_care: handleRegisterEmergencyCare,
   share_family_calendar: handleShareFamilyCalendar,

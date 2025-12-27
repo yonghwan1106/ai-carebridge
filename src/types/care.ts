@@ -70,6 +70,23 @@ export interface CareFacility {
   availableSlots: boolean;
   phone: string;
   website?: string;
+  // 상세 정보 (선택적)
+  detailInfo?: FacilityDetailInfo;
+}
+
+// 시설 상세 정보
+export interface FacilityDetailInfo {
+  totalCapacity?: number;      // 정원
+  currentOccupancy?: number;   // 현원
+  employeeCount?: number;      // 종사자수
+  representative?: string;     // 대표자명
+  establishedDate?: string;    // 개업일자
+  homepage?: string;           // 홈페이지
+  programs?: string[];         // 프로그램 정보
+  latitude?: number;           // 위도
+  longitude?: number;          // 경도
+  grade?: string;              // 평가등급 (A~E)
+  establishType?: string;      // 설립유형 (법인, 개인 등)
 }
 
 // 예약 정보
@@ -106,6 +123,10 @@ export interface CareState {
   familyEvents: FamilyEvent[];
   currentStep: CareStep;
   completedSteps: CareStep[];
+  // 즐겨찾기 & 비교 기능
+  favoriteFacilities: string[];  // 즐겨찾기한 시설 ID 목록
+  compareFacilities: string[];   // 비교할 시설 ID 목록 (최대 3개)
+  selectedFacility?: CareFacility; // 현재 선택된 시설 (상세 보기용)
 }
 
 // 돌봄 진행 단계
