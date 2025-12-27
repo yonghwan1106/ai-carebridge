@@ -74,7 +74,12 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const facilityId = searchParams.get('id');
+  const location = searchParams.get('location') || '서울';
+  const facilityType = searchParams.get('type') || '전체';
+  const pageNo = parseInt(searchParams.get('page') || '1');
+  const numOfRows = parseInt(searchParams.get('limit') || '20');
 
+  // 특정 시설 상세 조회
   if (facilityId) {
     try {
       const detail = await getLtcFacilityDetail(facilityId);
@@ -88,10 +93,43 @@ export async function GET(request: Request) {
     }
   }
 
-  // 기본 목록 반환
-  return NextResponse.json({
-    facilities: CARE_FACILITIES,
-    totalCount: CARE_FACILITIES.length,
-    isRealData: false
-  });
+  // 시설 목록 검색 - 실제 API 호출
+  try {
+    const result = await searchLtcFacilities({
+      location,
+      facilityType,
+      pageNo,
+      numOfRows
+    });
+
+    // API 결과가 있으면 반환
+    if (result.facilities.length > 0) {
+      return NextResponse.json({
+        facilities: result.facilities,
+        totalCount: result.totalCount,
+        isRealData: true,
+        dataSource: '공공데이터포털 (국민건강보험공단)'
+      });
+    }
+
+    // API 결과가 없으면 Mock 데이터로 폴백
+    throw new Error('API 결과 없음');
+
+  } catch (apiError) {
+    console.log('API 호출 실패, Mock 데이터 반환:', apiError);
+
+    // Mock 데이터 폴백
+    let mockFacilities = [...CARE_FACILITIES];
+
+    if (facilityType && facilityType !== '전체') {
+      mockFacilities = mockFacilities.filter(f => f.type === facilityType);
+    }
+
+    return NextResponse.json({
+      facilities: mockFacilities,
+      totalCount: mockFacilities.length,
+      isRealData: false,
+      dataSource: '샘플 데이터'
+    });
+  }
 }

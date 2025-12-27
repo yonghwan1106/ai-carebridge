@@ -29,20 +29,22 @@ interface LtcInsttSearchResponse {
 interface LtcInsttItem {
   longTermAdminSym: string;      // 장기요양기관기호
   adminNm: string;               // 기관명
-  longTermPeribRgtTypeCd: string; // 급여종류코드
-  longTermPeribRgtTypeNm: string; // 급여종류명 (재가, 시설 등)
-  adminPttnCd: string;           // 설립구분코드
-  adminPttnNm: string;           // 설립구분명
-  siDoCd: string;                // 시도코드
-  siDoNm: string;                // 시도명
-  siGunGuCd: string;             // 시군구코드
-  siGunGuNm: string;             // 시군구명
-  adminTelNo: string;            // 전화번호
-  ctprvnAddr: string;            // 주소
+  longTermPeribRgtTypeCd?: string; // 급여종류코드
+  longTermPeribRgtTypeNm?: string; // 급여종류명 (재가, 시설 등)
+  adminPttnCd?: string;           // 설립구분코드
+  adminPttnNm?: string;           // 설립구분명
+  siDoCd?: string;                // 시도코드
+  siDoNm?: string;                // 시도명
+  siGunGuCd?: string;             // 시군구코드
+  siGunGuNm?: string;             // 시군구명
+  adminTelNo?: string;            // 전화번호
+  ctprvnAddr?: string;            // 주소
   gradeCd?: string;              // 등급코드
   gradeNm?: string;              // 등급명 (A, B, C, D, E)
   totPer?: number;               // 정원
   curPer?: number;               // 현원
+  longTermPeribRgtDt?: string;   // 급여등록일
+  stpRptDt?: string;             // 설립신고일
 }
 
 interface LtcInsttDetailResponse {
@@ -103,6 +105,27 @@ const SIDO_CODES: Record<string, string> = {
   '경북': '47',
   '경남': '48',
   '제주': '50'
+};
+
+// 시도 코드 → 시도명 역매핑
+const SIDO_NAMES: Record<string, string> = {
+  '11': '서울특별시',
+  '26': '부산광역시',
+  '27': '대구광역시',
+  '28': '인천광역시',
+  '29': '광주광역시',
+  '30': '대전광역시',
+  '31': '울산광역시',
+  '36': '세종특별자치시',
+  '41': '경기도',
+  '42': '강원도',
+  '43': '충청북도',
+  '44': '충청남도',
+  '45': '전라북도',
+  '46': '전라남도',
+  '47': '경상북도',
+  '48': '경상남도',
+  '50': '제주특별자치도'
 };
 
 /**
@@ -201,19 +224,32 @@ export async function searchLtcFacilities(params: {
     const itemArray = Array.isArray(items) ? items : [items];
 
     // CareFacility 형식으로 변환
-    const facilities: CareFacility[] = itemArray.map((item, index) => ({
-      id: item.longTermAdminSym || `facility-${index}`,
-      name: item.adminNm,
-      type: mapFacilityType(item.longTermPeribRgtTypeNm),
-      address: item.ctprvnAddr || `${item.siDoNm} ${item.siGunGuNm}`,
-      rating: mapGradeToRating(item.gradeNm),
-      reviewCount: Math.floor(Math.random() * 50) + 10, // API에서 제공하지 않음
-      monthlyFee: estimateMonthlyFee(item.longTermPeribRgtTypeNm),
-      specialties: inferSpecialties(item.longTermPeribRgtTypeNm, item.adminPttnNm),
-      availableSlots: item.curPer && item.totPer ? item.curPer < item.totPer : true,
-      phone: item.adminTelNo || '문의필요',
-      distance: undefined // 거리 계산은 별도 로직 필요
-    }));
+    const facilities: CareFacility[] = itemArray.map((item, index) => {
+      // 주소 생성: ctprvnAddr이 있으면 사용, 없으면 시도/시군구 코드로 생성
+      let address = item.ctprvnAddr;
+      if (!address) {
+        const sidoName = item.siDoNm || (item.siDoCd ? SIDO_NAMES[item.siDoCd] : '');
+        const sigunguName = item.siGunGuNm || '';
+        address = `${sidoName} ${sigunguName}`.trim() || '주소 미제공';
+      }
+
+      // 시설 유형 추론: 이름에서 유형 추출
+      const facilityType = mapFacilityType(item.longTermPeribRgtTypeNm || item.adminNm);
+
+      return {
+        id: item.longTermAdminSym || `facility-${index}`,
+        name: item.adminNm,
+        type: facilityType,
+        address,
+        rating: mapGradeToRating(item.gradeNm),
+        reviewCount: Math.floor(Math.random() * 50) + 10, // API에서 제공하지 않음
+        monthlyFee: estimateMonthlyFee(item.longTermPeribRgtTypeNm || item.adminNm),
+        specialties: inferSpecialties(item.longTermPeribRgtTypeNm || item.adminNm, item.adminPttnNm),
+        availableSlots: item.curPer && item.totPer ? item.curPer < item.totPer : true,
+        phone: item.adminTelNo || '문의필요',
+        distance: undefined // 거리 계산은 별도 로직 필요
+      };
+    });
 
     return {
       facilities,
@@ -275,12 +311,15 @@ export async function getLtcFacilityDetail(adminSym: string): Promise<LtcInsttDe
 
 // 헬퍼 함수들
 
-function mapFacilityType(typeNm: string): CareFacility['type'] {
-  if (typeNm?.includes('주야간')) return '주간보호센터';
-  if (typeNm?.includes('요양시설') || typeNm?.includes('노인요양')) return '요양원';
-  if (typeNm?.includes('재가') || typeNm?.includes('방문')) return '재가서비스';
-  if (typeNm?.includes('공동생활')) return '양로원';
-  if (typeNm?.includes('병원')) return '요양병원';
+function mapFacilityType(typeNmOrName: string): CareFacility['type'] {
+  const text = typeNmOrName || '';
+  // 급여종류명 또는 시설명에서 유형 추론
+  if (text.includes('주야간') || text.includes('데이케어') || text.includes('주간보호')) return '주간보호센터';
+  if (text.includes('요양시설') || text.includes('노인요양') || text.includes('요양원')) return '요양원';
+  if (text.includes('재가') || text.includes('방문')) return '재가서비스';
+  if (text.includes('공동생활') || text.includes('양로')) return '양로원';
+  if (text.includes('병원')) return '요양병원';
+  if (text.includes('복지관')) return '주간보호센터';
   return '재가서비스';
 }
 
