@@ -219,18 +219,33 @@ export async function searchLtcFacilities(params: {
 
     // XML 응답 파싱
     const xmlText = await response.text();
-    console.log('[LTC API] XML 응답 길이:', xmlText.length);
-    console.log('[LTC API] XML 시작:', xmlText.substring(0, 200));
+    console.log('[LTC API] 응답 Content-Type:', response.headers.get('content-type'));
+    console.log('[LTC API] XML 응답 길이:', xmlText?.length || 0);
+
+    if (!xmlText || xmlText.length === 0) {
+      throw new Error('API 응답이 비어 있습니다');
+    }
+
+    // XML이 아닌 경우 (HTML 에러 페이지 등)
+    if (!xmlText.startsWith('<?xml')) {
+      console.log('[LTC API] XML이 아닌 응답:', xmlText.substring(0, 300));
+      throw new Error('API 응답이 XML 형식이 아닙니다');
+    }
 
     const data = xmlParser.parse(xmlText);
-    console.log('[LTC API] 파싱된 구조 키:', Object.keys(data));
+    console.log('[LTC API] 파싱된 구조 키:', data ? Object.keys(data) : 'null');
 
     // 응답 구조 확인
-    const responseData = data.response || data;
+    if (!data || !data.response) {
+      console.log('[LTC API] data.response가 없습니다. data:', JSON.stringify(data).substring(0, 300));
+      throw new Error('XML 파싱 결과에 response가 없습니다');
+    }
+
+    const responseData = data.response;
     const header = responseData.header;
     const body = responseData.body;
 
-    console.log('[LTC API] header:', JSON.stringify(header));
+    console.log('[LTC API] header:', header ? JSON.stringify(header) : 'no header');
     console.log('[LTC API] body keys:', body ? Object.keys(body) : 'no body');
 
     if (header && header.resultCode !== '00') {
@@ -239,7 +254,8 @@ export async function searchLtcFacilities(params: {
 
     const items = body?.items?.item;
     if (!items) {
-      console.log('[LTC API] items가 없습니다. body:', JSON.stringify(body).substring(0, 500));
+      const bodyStr = JSON.stringify(body) || 'undefined';
+      console.log('[LTC API] items가 없습니다. body:', bodyStr.substring(0, Math.min(500, bodyStr.length)));
       return { facilities: [], totalCount: 0 };
     }
 
