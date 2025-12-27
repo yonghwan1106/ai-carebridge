@@ -164,8 +164,11 @@ export async function searchLtcFacilities(params: {
 }): Promise<{ facilities: CareFacility[]; totalCount: number }> {
   const apiKey = process.env.PUBLIC_DATA_API_KEY;
 
+  console.log('[LTC API] API Key exists:', !!apiKey);
+  console.log('[LTC API] API Key length:', apiKey?.length || 0);
+
   if (!apiKey) {
-    console.warn('PUBLIC_DATA_API_KEY가 설정되지 않았습니다. Mock 데이터를 반환합니다.');
+    console.warn('[LTC API] PUBLIC_DATA_API_KEY가 설정되지 않았습니다.');
     return { facilities: [], totalCount: 0 };
   }
 
@@ -257,7 +260,8 @@ export async function searchLtcFacilities(params: {
     };
 
   } catch (error) {
-    console.error('장기요양기관 검색 API 오류:', error);
+    console.error('[LTC API] 장기요양기관 검색 API 오류:', error);
+    console.error('[LTC API] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     throw error;
   }
 }

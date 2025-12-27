@@ -116,7 +116,8 @@ export async function GET(request: Request) {
     throw new Error('API 결과 없음');
 
   } catch (apiError) {
-    console.log('API 호출 실패, Mock 데이터 반환:', apiError);
+    const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+    console.log('[Facilities API] API 호출 실패:', errorMessage);
 
     // Mock 데이터 폴백
     let mockFacilities = [...CARE_FACILITIES];
@@ -129,7 +130,12 @@ export async function GET(request: Request) {
       facilities: mockFacilities,
       totalCount: mockFacilities.length,
       isRealData: false,
-      dataSource: '샘플 데이터'
+      dataSource: '샘플 데이터',
+      debug: {
+        apiKeyExists: !!process.env.PUBLIC_DATA_API_KEY,
+        apiKeyLength: process.env.PUBLIC_DATA_API_KEY?.length || 0,
+        error: errorMessage
+      }
     });
   }
 }
