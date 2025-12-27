@@ -104,25 +104,37 @@ function FacilitiesContent() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        const requestBody = {
+          location: selectedSido,
+          sigungu: selectedSigungu === '전체' ? undefined : selectedSigungu,
+          facilityType: selectedType === '전체' ? undefined : selectedType,
+          numOfRows: 50
+        };
+        console.log('[Facilities] Fetching with:', requestBody);
+
         const response = await fetch('/api/facilities', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: selectedSido,
-            sigungu: selectedSigungu === '전체' ? undefined : selectedSigungu,
-            facilityType: selectedType === '전체' ? undefined : selectedType,
-            numOfRows: 50
-          })
+          body: JSON.stringify(requestBody)
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          setFacilities(data.facilities || []);
-          setTotalCount(data.totalCount || 0);
+        console.log('[Facilities] Response status:', response.status);
+
+        const data = await response.json();
+        console.log('[Facilities] Data received:', data.totalCount, 'facilities');
+
+        if (data.facilities && Array.isArray(data.facilities)) {
+          setFacilities(data.facilities);
+          setTotalCount(data.totalCount || data.facilities.length);
+        } else {
+          console.error('[Facilities] Invalid data format:', data);
+          setFacilities([]);
+          setTotalCount(0);
         }
       } catch (error) {
-        console.error('시설 검색 오류:', error);
+        console.error('[Facilities] 검색 오류:', error);
         setFacilities([]);
+        setTotalCount(0);
       } finally {
         setIsLoading(false);
       }
