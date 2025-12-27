@@ -227,9 +227,11 @@ export async function searchLtcFacilities(params: {
     }
 
     // XML이 아닌 경우 (HTML 에러 페이지 등)
-    if (!xmlText.startsWith('<?xml')) {
-      console.log('[LTC API] XML이 아닌 응답:', xmlText.substring(0, 300));
-      throw new Error('API 응답이 XML 형식이 아닙니다');
+    const isXml = xmlText.startsWith('<?xml') || xmlText.startsWith('<response');
+    if (!isXml) {
+      const preview = xmlText.substring(0, 500);
+      console.log('[LTC API] XML이 아닌 응답:', preview);
+      throw new Error(`API 응답이 XML 형식이 아닙니다: ${preview.substring(0, 100)}`);
     }
 
     const data = xmlParser.parse(xmlText);
