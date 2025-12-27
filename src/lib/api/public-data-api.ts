@@ -6,7 +6,14 @@ import type { CareFacility } from '@/types/care';
 import { XMLParser } from 'fast-xml-parser';
 
 const BASE_URL = 'https://apis.data.go.kr/B550928';
-const xmlParser = new XMLParser();
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+  parseTagValue: true,
+  parseAttributeValue: true,
+  trimValues: true
+});
 
 // API 응답 타입 정의
 interface LtcInsttSearchResponse {
@@ -202,7 +209,7 @@ export async function searchLtcFacilities(params: {
 
   try {
     const url = `${BASE_URL}/searchLtcInsttService02/getLtcInsttSeachList02?${queryParams.toString()}`;
-    console.log('API 호출:', url.replace(apiKey, 'API_KEY'));
+    console.log('[LTC API] 호출 URL:', url.replace(apiKey, 'API_KEY'));
 
     const response = await fetch(url);
 
@@ -212,14 +219,27 @@ export async function searchLtcFacilities(params: {
 
     // XML 응답 파싱
     const xmlText = await response.text();
-    const data: LtcInsttSearchResponse = xmlParser.parse(xmlText);
+    console.log('[LTC API] XML 응답 길이:', xmlText.length);
+    console.log('[LTC API] XML 시작:', xmlText.substring(0, 200));
 
-    if (data.response.header.resultCode !== '00') {
-      throw new Error(`API 오류: ${data.response.header.resultMsg}`);
+    const data = xmlParser.parse(xmlText);
+    console.log('[LTC API] 파싱된 구조 키:', Object.keys(data));
+
+    // 응답 구조 확인
+    const responseData = data.response || data;
+    const header = responseData.header;
+    const body = responseData.body;
+
+    console.log('[LTC API] header:', JSON.stringify(header));
+    console.log('[LTC API] body keys:', body ? Object.keys(body) : 'no body');
+
+    if (header && header.resultCode !== '00') {
+      throw new Error(`API 오류: ${header.resultMsg}`);
     }
 
-    const items = data.response.body.items?.item;
+    const items = body?.items?.item;
     if (!items) {
+      console.log('[LTC API] items가 없습니다. body:', JSON.stringify(body).substring(0, 500));
       return { facilities: [], totalCount: 0 };
     }
 
@@ -256,7 +276,7 @@ export async function searchLtcFacilities(params: {
 
     return {
       facilities,
-      totalCount: data.response.body.totalCount
+      totalCount: body.totalCount || facilities.length
     };
 
   } catch (error) {
